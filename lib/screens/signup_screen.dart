@@ -77,7 +77,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           children: [
             // Heading
             Padding(
-              padding: const EdgeInsets.only(top: 32.0),
+              padding: const EdgeInsets.only(top: 10.0),
               child: Text(
                 "Ready to ResQ?",
                 style: theme.textTheme.headlineMedium,

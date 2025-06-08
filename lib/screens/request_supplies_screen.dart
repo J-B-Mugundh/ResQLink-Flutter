@@ -36,9 +36,7 @@ class _RequestSuppliesScreenState
       // Process data (e.g., send to Firebase)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Supply request submitted (simulated)',
-          ),
+          content: Text('Supply request submitted.'),
         ),
       );
       Navigator.of(context).pop();

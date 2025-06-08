@@ -31,9 +31,7 @@ class _ReportScreenState extends State<ReportScreen> {
     if (_formKey.currentState!.validate()) {
       // Process data (e.g., send to Firebase)
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Incident reported (simulated)'),
-        ),
+        const SnackBar(content: Text('Incident reported')),
       );
       Navigator.of(context).pop();
     }

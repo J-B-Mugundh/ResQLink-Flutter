@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'signup_screen.dart'; // Import SignUpScreen for routeName
-import 'home_screen.dart'; // Import HomeScreen for routeName
+// import 'signup_screen.dart'; // Import SignUpScreen for routeName
+// import 'home_screen.dart'; // Import HomeScreen for routeName
+import 'splash_screen.dart';
 import '../const/colors.dart'; // Import AppColor
 import 'package:lottie/lottie.dart';
 
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Use pushReplacementNamed with HomeScreen.routeName
         Navigator.of(
           context,
-        ).pushReplacementNamed(HomeScreen.routeName);
+        ).pushReplacementNamed(SplashScreen.routeName);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -76,7 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.only(top: 32.0),
+              padding: const EdgeInsets.only(top: 10.0),
               child: Text(
                 "Welcome Back",
                 style: theme.textTheme.headlineMedium,
@@ -173,17 +174,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             child: const Text("Login"),
                           ),
-                      TextButton(
-                        onPressed: () {
-                          // Use pushNamed with SignUpScreen.routeName
-                          Navigator.of(context).pushNamed(
-                            SignUpScreen.routeName,
-                          );
-                        },
-                        child: const Text(
-                          "Don't have an account? Sign Up",
-                        ),
-                      ),
+                      // TextButton(
+                      //   onPressed: () {
+                      //     // Use pushNamed with SignUpScreen.routeName
+                      //     Navigator.of(context).pushNamed(
+                      //       SignUpScreen.routeName,
+                      //     );
+                      //   },
+                      //   child: const Text(
+                      //     "Don't have an account? Sign Up",
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

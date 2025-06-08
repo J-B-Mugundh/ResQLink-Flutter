@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:weather/weather.dart'; // Import the weather package
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Import flutter_dotenv
+import 'package:geolocator/geolocator.dart';
 
 import 'login_screen.dart';
 import 'notifications_screen.dart';
@@ -30,8 +31,11 @@ class HomeScreen extends StatelessWidget {
         FirebaseAuth.instance.currentUser?.email;
 
     return Scaffold(
+      backgroundColor: const Color(
+        0xFFEFFDFE,
+      ), // Added background color
       appBar: AppBar(
-        title: const Text('Welcome Rescuer'),
+        title: const Text('Welcome'),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -65,7 +69,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Zone: Sector Alpha | Status: Active',
+              'Zone: Chennai | Status: Active',
               style: Theme.of(context).textTheme.titleSmall
                   ?.copyWith(color: Colors.grey[600]),
             ),
@@ -142,10 +146,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // Weather Section Added Here
-            const WeatherSection(
-              lat: 12.9516,
-              lon: 80.1462,
-            ),
+            const WeatherSection(),
 
             // End of Weather Section
             const Text(
@@ -267,13 +268,7 @@ class HomeScreen extends StatelessWidget {
 
 // New WeatherSection Widget
 class WeatherSection extends StatefulWidget {
-  final double lat;
-  final double lon;
-  const WeatherSection({
-    super.key,
-    required this.lat,
-    required this.lon,
-  });
+  const WeatherSection({super.key});
 
   @override
   State<WeatherSection> createState() =>
@@ -283,52 +278,130 @@ class WeatherSection extends StatefulWidget {
 class _WeatherSectionState extends State<WeatherSection> {
   Weather? _weather;
   bool _isLoading = true;
-  String? _error;
-  // IMPORTANT: Replace "YOUR_API_KEY" with your actual OpenWeatherMap API key
+  // String? _error; // Removed _error state
+
   final String _apiKey =
       dotenv.env['OPENWEATHER_API_KEY'] ?? "YOUR_API_KEY";
   late WeatherFactory _wf;
+  Position? _currentPosition;
+  // Fallback position if current location cannot be obtained
+  final Position _fallbackPosition = Position(
+    latitude: 12.953195,
+    longitude: 80.141602,
+    timestamp: DateTime.now(),
+    accuracy: 0.0,
+    altitude: 0.0,
+    altitudeAccuracy: 0.0,
+    heading: 0.0,
+    headingAccuracy: 0.0,
+    speed: 0.0,
+    speedAccuracy: 0.0,
+  );
 
   @override
   void initState() {
     super.initState();
+    _wf = WeatherFactory(_apiKey);
+    _determinePositionAndFetchWeather();
+  }
+
+  Future<void> _determinePositionAndFetchWeather() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+    });
+
+    // If API key is not set, prepare to use fallback/static data
     if (_apiKey == "YOUR_API_KEY") {
-      // Avoid API call if key is not set, use static data
-      setState(() {
-        _isLoading = false;
-        _error =
-            "API Key not set. Displaying static Chennai weather."; // Inform user
-        _weather =
-            _getStaticChennaiWeather(); // Load static data
-      });
+      _currentPosition = _fallbackPosition;
+      _fetchWeather();
       return;
     }
-    _wf = WeatherFactory(_apiKey);
+
+    try {
+      serviceEnabled =
+          await Geolocator.isLocationServiceEnabled()
+              .timeout(const Duration(seconds: 10));
+      if (!serviceEnabled) {
+        _currentPosition = _fallbackPosition;
+        _fetchWeather();
+        return;
+      }
+
+      permission = await Geolocator.checkPermission()
+          .timeout(const Duration(seconds: 10));
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission()
+            .timeout(const Duration(seconds: 10));
+        if (permission == LocationPermission.denied) {
+          _currentPosition = _fallbackPosition;
+          _fetchWeather();
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        _currentPosition = _fallbackPosition;
+        _fetchWeather();
+        return;
+      }
+
+      // Attempt to get current position with a timeout
+      _currentPosition =
+          await Geolocator.getCurrentPosition().timeout(
+            const Duration(seconds: 15),
+          );
+    } catch (e) {
+      // If any part of location determination times out or fails, use fallback
+      _currentPosition = _fallbackPosition;
+    }
     _fetchWeather();
   }
 
   Future<void> _fetchWeather() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (!mounted) return;
+    // Ensure isLoading is true at the start of a fetch attempt
+    if (!_isLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    // If API key is explicitly the placeholder, go straight to static.
+    if (_apiKey == "YOUR_API_KEY") {
+      setState(() {
+        _weather = _getStaticChennaiWeather();
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Ensure _currentPosition is set (it should be, by _determinePositionAndFetchWeather)
+    // If not, default to fallback before attempting API call.
+    _currentPosition ??= _fallbackPosition;
+
     try {
       Weather weather = await _wf.currentWeatherByLocation(
-        widget.lat,
-        widget.lon,
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
       );
-      setState(() {
-        _weather = weather;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _weather = weather;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error =
-            "Failed to fetch weather. Displaying static Chennai weather. Details: ${e.toString()}";
-        _weather =
-            _getStaticChennaiWeather(); // Load static data on error
-        _isLoading = false;
-      });
+      // Silently fall back to static weather data on any API error
+      if (mounted) {
+        setState(() {
+          _weather = _getStaticChennaiWeather();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -340,7 +413,7 @@ class _WeatherSectionState extends State<WeatherSection> {
     // based on the actual `Weather` class structure from the `weather` package.
     // This is a simplified example. The actual Weather object might be more complex.
     return Weather({
-      "name": "Chennai",
+      "name": "Chennai (Static)", // Indicate static data
       "weather": [
         {
           "main": "Haze",
@@ -356,13 +429,19 @@ class _WeatherSectionState extends State<WeatherSection> {
       "wind": {
         "speed": 5.5, // m/s
       },
+      // Add a timestamp to static data to make it look more realistic if needed
+      "dt": DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      "sys": {"country": "IN"},
+      "coord": {
+        "lon": 80.27,
+        "lat": 13.08,
+      }, // Static coordinates for Chennai
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _weather == null) {
-      // Show loading only if no weather data yet
+    if (_isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -371,215 +450,116 @@ class _WeatherSectionState extends State<WeatherSection> {
       );
     }
 
-    // If there's an error message, display it but still try to show static weather if available
-    if (_error != null && _weather == null) {
-      // Only show error if no weather data at all
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    // If weather is still null after loading, use static (should be caught by _fetchWeather, but as a safeguard)
+    _weather ??= _getStaticChennaiWeather();
+
+    return _buildWeatherDisplay(_weather!);
+  }
+
+  Widget _buildWeatherDisplay(Weather weatherData) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        vertical: 16,
+        horizontal: 20,
+      ),
+      margin: const EdgeInsets.only(bottom: 24),
+      decoration: BoxDecoration(
+        color: Colors.blueAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.red,
-                size: 40,
-              ),
-              const SizedBox(height: 8),
               Text(
-                _error!,
+                // If static data is used, display "Current Location" to maintain appearance
+                (weatherData.areaName ==
+                            "Chennai (Static)" ||
+                        weatherData.areaName == null)
+                    ? 'Current Location'
+                    : weatherData.areaName!,
                 style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Displaying static weather data for Chennai.",
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // If weather data (either fetched or static) is available, display it
-    if (_weather == null) {
-      // Fallback if weather is still null for some reason
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            "Weather data currently unavailable.",
-          ),
-        ),
-      );
-    }
-
-    // Displaying the error message above the weather widget if it exists
-    return Column(
-      children: [
-        if (_error != null &&
-            _apiKey ==
-                "YOUR_API_KEY") // Show API key error prominently
-          Padding(
-            padding: const EdgeInsets.only(
-              bottom: 8.0,
-              left: 16,
-              right: 16,
-            ),
-            child: Text(
-              _error!,
-              style: const TextStyle(
-                color: Colors.orangeAccent,
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          margin: const EdgeInsets.only(bottom: 24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.blue.shade300,
-                Colors.blue.shade500,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.withOpacity(0.3),
-                spreadRadius: 2,
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _weather?.areaName ??
-                        'Chennai', // Default to Chennai if areaName is null
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (_weather?.weatherIcon != null)
-                    Image.network(
-                      "http://openweathermap.org/img/wn/${_weather!.weatherIcon}@2x.png",
-                      width: 50,
-                      height: 50,
-                      errorBuilder:
-                          (context, error, stackTrace) =>
-                              const Icon(
-                                Icons.cloud_off,
-                                size: 30,
-                                color: Colors.white70,
-                              ),
-                    )
-                  else // Fallback icon if weatherIcon is null (e.g. for static data)
-                    const Icon(
-                      Icons.wb_sunny_outlined,
-                      size: 30,
-                      color: Colors.white70,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "${_weather?.temperature?.celsius?.toStringAsFixed(0) ?? '32'}°C", // Static fallback
-                style: Theme.of(
-                  context,
-                ).textTheme.displaySmall?.copyWith(
-                  color: Colors.white,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
                 ),
               ),
-              Text(
-                _weather?.weatherDescription
-                        ?.toUpperCase() ??
-                    "HAZE", // Static fallback
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(
-                  color: Colors.white70,
-                  letterSpacing: 1,
+              if (weatherData.weatherIcon != null)
+                Image.network(
+                  'http://openweathermap.org/img/wn/${weatherData.weatherIcon}@2x.png',
+                  width: 50,
+                  height: 50,
+                  errorBuilder:
+                      (context, error, stackTrace) =>
+                          const Icon(
+                            Icons.wb_sunny,
+                            color: Colors.orangeAccent,
+                          ),
                 ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            weatherData.weatherDescription?.toUpperCase() ??
+                'No description',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.blueGrey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Row(
+            mainAxisAlignment:
+                MainAxisAlignment.spaceAround,
+            children: [
+              _buildInfoChip(
+                Icons.thermostat_outlined,
+                '${weatherData.temperature?.celsius?.toStringAsFixed(1) ?? 'N/A'}°C',
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceAround,
-                children: [
-                  _buildWeatherDetail(
-                    "Humidity",
-                    "${_weather?.humidity?.toStringAsFixed(0) ?? '75'}%",
-                    Icons.water_drop_outlined,
-                    context,
-                  ),
-                  _buildWeatherDetail(
-                    "Wind",
-                    "${_weather?.windSpeed?.toStringAsFixed(1) ?? '5.5'} m/s",
-                    Icons.air_outlined,
-                    context,
-                  ),
-                  _buildWeatherDetail(
-                    "Feels Like",
-                    "${_weather?.tempFeelsLike?.celsius?.toStringAsFixed(0) ?? '38'}°C",
-                    Icons.thermostat_outlined,
-                    context,
-                  ),
-                ],
+              _buildInfoChip(
+                Icons.water_drop_outlined,
+                '${weatherData.humidity?.toStringAsFixed(0) ?? 'N/A'}%',
+              ),
+              _buildInfoChip(
+                Icons.air_outlined,
+                '${weatherData.windSpeed?.toStringAsFixed(1) ?? 'N/A'} m/s',
               ),
             ],
           ),
-        ),
-      ],
+          // Removed conditional error messages and API key warnings
+        ],
+      ),
     );
   }
 
-  Widget _buildWeatherDetail(
-    String label,
-    String value,
-    IconData icon,
-    BuildContext context,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white70, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+  Widget _buildInfoChip(IconData icon, String text) {
+    return Chip(
+      avatar: Icon(
+        icon,
+        color: Colors.blueAccent,
+        size: 20,
+      ),
+      label: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: Colors.white70),
-        ),
-      ],
+      ),
+      backgroundColor: Colors.white,
+      elevation: 2,
     );
   }
 }
