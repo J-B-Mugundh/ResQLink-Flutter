@@ -4,14 +4,14 @@ ResQLink is a Flutter-based mobile application designed for first responders to 
 
 ## Features
 
-_(You can list key features of your application here)_
-
+- Real-time Notifications
+- Google Map Integration to the emergency location
 - Incident Reporting
 - Supply Requests
-- Real-time Notifications
+- Weather Information
 - User Authentication
 - Profile Management
-- Weather Information
+
 
 ## Getting Started
 
@@ -51,6 +51,7 @@ Follow these instructions to get a copy of the project up and running on your lo
 3.  **Firebase Setup:**
     This project is configured to use Firebase. The necessary Firebase configuration file ([`lib/firebase_options.dart`](lib/firebase_options.dart)) is included in the repository.
 
+    - Add the Relevant API keys and application IDs in the `.env` file.
     - Ensure you have a Firebase project created at [https://console.firebase.google.com/](https://console.firebase.google.com/).
     - The existing `firebase_options.dart` is configured for the project ID `resqlink-mobile-app`. If you are using a different Firebase project, you will need to configure your app with Firebase. Follow the [FlutterFire CLI documentation](https://firebase.google.com/docs/flutter/setup?platform=ios#flutterfire-cli) to add your Flutter app to your Firebase project and generate a new `firebase_options.dart` file.
     - For Android, ensure you have the `google-services.json` file from your Firebase project settings placed in the `android/app/` directory if it's not already configured via `firebase_options.dart` or if you encounter issues.
@@ -70,10 +71,6 @@ Follow these instructions to get a copy of the project up and running on your lo
     ```
     To run on a specific device, use `flutter run -d <deviceId>`. You can list available devices with `flutter devices`.
 
-## Project Structure
-
-_(Briefly describe the main directories and their purpose, e.g., `lib/screens`, `lib/widgets`, `lib/services`)_
-
 ## Dependencies
 
 Key dependencies used in this project include:
@@ -85,18 +82,9 @@ Key dependencies used in this project include:
 - `weather`
 - `lottie`
 - `maps_launcher`
-- _(Add any other important dependencies)_
 
 (Refer to the [`pubspec.yaml`](pubspec.yaml) file for a full list of dependencies.)
 
 ## Contributing
 
-_(If you are open to contributions, add guidelines here)_
-
-## License
-
-_(Specify the license for your project, e.g., MIT License)_
-
----
-
-Remember to replace placeholders like `your_actual_openweather_api_key` and fill in sections like "Features", "Project Structure", "Contributing", and "License" with your specific project details.
+Feel free to contribute and build with us!
